@@ -1,6 +1,7 @@
 import ExternalAPI from '@server/api/externalapi';
 import {
   coalescePages,
+  filterMediaByRating,
   filterMixedResults,
   filterMoviesByRating,
   filterTvByRating,
@@ -272,6 +273,31 @@ describe('filterMixedResults', () => {
   });
 });
 
+describe('filterMediaByRating', () => {
+  it('looks ratings up by tmdbId rather than the media row id', async () => {
+    const items = [
+      { id: 900, tmdbId: 3, mediaType: 'movie' },
+      { id: 901, tmdbId: 1, mediaType: 'movie' },
+      { id: 902, tmdbId: 12, mediaType: 'tv' },
+      { id: 903, tmdbId: 11, mediaType: 'tv' },
+    ];
+    const result = await filterMediaByRating(items, {
+      maxMovieRating: 'PG-13',
+      maxTvRating: 'TV-14',
+    });
+    assert.deepEqual(result, [
+      { id: 901, tmdbId: 1, mediaType: 'movie' },
+      { id: 903, tmdbId: 11, mediaType: 'tv' },
+    ]);
+  });
+
+  it('returns the list untouched when there are no limits', async () => {
+    const items = [{ id: 900, tmdbId: 3, mediaType: 'movie' }];
+    assert.equal(await filterMediaByRating(items, undefined), items);
+    assert.equal(externalApiGetMock.callCount(), 0);
+  });
+});
+
 describe('coalescePages', () => {
   const upstream = (totalPages: number) => (page: number) =>
     Promise.resolve({
@@ -298,7 +324,10 @@ describe('coalescePages', () => {
     const a = await coalescePages(1, upstream(10), noFilter);
     const b = await coalescePages(2, upstream(10), noFilter);
     const seen = new Set(a.results);
-    assert.equal(b.results.some((r) => seen.has(r)), false);
+    assert.equal(
+      b.results.some((r) => seen.has(r)),
+      false
+    );
   });
 
   it('stops at the upstream last page instead of over-fetching', async () => {
@@ -308,9 +337,13 @@ describe('coalescePages', () => {
   });
 
   it('applies the filter to the combined window', async () => {
-    const evens = (r: number[]) => Promise.resolve(r.filter((n) => n % 2 === 0));
+    const evens = (r: number[]) =>
+      Promise.resolve(r.filter((n) => n % 2 === 0));
     const page = await coalescePages(1, upstream(10), evens);
     assert.equal(page.results.length, 20);
-    assert.equal(page.results.every((n) => n % 2 === 0), true);
+    assert.equal(
+      page.results.every((n) => n % 2 === 0),
+      true
+    );
   });
 });

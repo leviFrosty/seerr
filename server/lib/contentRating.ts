@@ -150,6 +150,24 @@ export async function filterMixedResults<T extends { id: number }>(
   );
 }
 
+// Library media rows (e.g. the Recently Added slider) are keyed by our own
+// database id, so look ratings up by tmdbId instead. Unknown media types are
+// dropped, matching filterMixedResults.
+export async function filterMediaByRating<
+  T extends { tmdbId: number; mediaType: string },
+>(items: T[], limits: UserContentRatingLimits | undefined): Promise<T[]> {
+  if (!limits) return items;
+
+  const keyed = items.map((media) => ({
+    id: media.tmdbId,
+    mediaType: media.mediaType,
+    media,
+  }));
+  const allowed = await filterMixedResults(keyed, limits);
+
+  return allowed.map((entry) => entry.media);
+}
+
 export const COALESCE_FACTOR = 2;
 
 export interface CoalescedPage<T> {

@@ -11,6 +11,10 @@ import type {
   MediaResultsResponse,
   MediaWatchDataResponse,
 } from '@server/interfaces/api/mediaInterfaces';
+import {
+  filterMediaByRating,
+  getUserContentRatingLimits,
+} from '@server/lib/contentRating';
 import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import logger from '@server/logger';
@@ -81,6 +85,14 @@ mediaRoutes.get('/', async (req, res, next) => {
       take: pageSize,
       skip,
     });
+
+    // Filtered in place, so a rating-limited user can get a short page;
+    // pageInfo stays an upper bound, like coalesced search/trending pages.
+    const results = await filterMediaByRating(
+      media,
+      getUserContentRatingLimits(req.user)
+    );
+
     return res.status(200).json({
       pageInfo: {
         pages: Math.ceil(mediaCount / pageSize),
@@ -88,7 +100,7 @@ mediaRoutes.get('/', async (req, res, next) => {
         results: mediaCount,
         page: Math.ceil(skip / pageSize) + 1,
       },
-      results: media,
+      results,
     } as MediaResultsResponse);
   } catch (e) {
     next({ status: 500, message: e.message });
