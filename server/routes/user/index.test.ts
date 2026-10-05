@@ -18,7 +18,7 @@ import type { Express } from 'express';
 import express from 'express';
 import session from 'express-session';
 import request from 'supertest';
-import userRoutes from '.';
+import userRoutes, { validateBulkParentalControlFields } from '.';
 
 let app: Express;
 
@@ -143,5 +143,52 @@ describe('GET /user/:id', () => {
     assert.strictEqual(res.status, 200);
     assert.ok(!('settings' in res.body));
     assertNoCredentials(res.body);
+  });
+});
+
+describe('validateBulkParentalControlFields', () => {
+  it('accepts an empty body', () => {
+    assert.equal(validateBulkParentalControlFields({}), null);
+  });
+
+  it('accepts valid movie and TV ratings with blockUnrated', () => {
+    assert.equal(
+      validateBulkParentalControlFields({
+        maxMovieRating: 'PG-13',
+        maxTvRating: 'TV-14',
+        blockUnrated: true,
+      }),
+      null
+    );
+  });
+
+  it('rejects an invalid movie rating', () => {
+    assert.match(
+      validateBulkParentalControlFields({ maxMovieRating: 'XX' }) ?? '',
+      /Invalid movie rating: XX/
+    );
+  });
+
+  it('rejects an invalid TV rating', () => {
+    assert.match(
+      validateBulkParentalControlFields({ maxTvRating: 'XX' }) ?? '',
+      /Invalid TV rating: XX/
+    );
+  });
+
+  it('rejects a non-boolean blockUnrated', () => {
+    assert.match(
+      validateBulkParentalControlFields({
+        blockUnrated: 'yes' as unknown as boolean,
+      }) ?? '',
+      /blockUnrated must be a boolean/
+    );
+  });
+
+  it('allows an empty-string rating to clear the restriction', () => {
+    assert.equal(
+      validateBulkParentalControlFields({ maxMovieRating: '', maxTvRating: '' }),
+      null
+    );
   });
 });

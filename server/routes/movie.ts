@@ -2,10 +2,16 @@ import IMDBRadarrProxy from '@server/api/rating/imdbRadarrProxy';
 import RottenTomatoes from '@server/api/rating/rottentomatoes';
 import { type RatingResponse } from '@server/api/ratings';
 import TheMovieDb from '@server/api/themoviedb';
+import { shouldFilterMovie } from '@server/constants/contentRatings';
 import { MediaType } from '@server/constants/media';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { Watchlist } from '@server/entity/Watchlist';
+import {
+  filterMoviesByRating,
+  getMovieCertification,
+  getUserContentRatingLimits,
+} from '@server/lib/contentRating';
 import logger from '@server/logger';
 import { mapMovieDetails } from '@server/models/Movie';
 import { mapMovieResult } from '@server/models/Search';
@@ -21,6 +27,21 @@ movieRoutes.get('/:id', async (req, res, next) => {
       movieId: Number(req.params.id),
       language: (req.query.language as string) ?? req.locale,
     });
+
+    const limits = getUserContentRatingLimits(req.user);
+    if (
+      limits &&
+      shouldFilterMovie(
+        getMovieCertification(tmdbMovie),
+        limits.maxMovieRating,
+        limits.blockUnrated
+      )
+    ) {
+      return res.status(403).json({
+        status: 403,
+        message: 'Content restricted by parental controls.',
+      });
+    }
 
     const media = await Media.getMedia(tmdbMovie.id, MediaType.MOVIE);
 
@@ -70,9 +91,12 @@ movieRoutes.get('/:id/recommendations', async (req, res, next) => {
       language: (req.query.language as string) ?? req.locale,
     });
 
+    const limits = getUserContentRatingLimits(req.user);
+    const filteredResults = await filterMoviesByRating(results.results, limits);
+
     const media = await Media.getRelatedMedia(
       req.user,
-      results.results.map((result) => ({
+      filteredResults.map((result) => ({
         tmdbId: result.id,
         mediaType: MediaType.MOVIE,
       })),
@@ -83,7 +107,7 @@ movieRoutes.get('/:id/recommendations', async (req, res, next) => {
       page: results.page,
       totalPages: results.total_pages,
       totalResults: results.total_results,
-      results: results.results.map((result) =>
+      results: filteredResults.map((result) =>
         mapMovieResult(
           result,
           media.find(
@@ -116,9 +140,12 @@ movieRoutes.get('/:id/similar', async (req, res, next) => {
       language: (req.query.language as string) ?? req.locale,
     });
 
+    const limits = getUserContentRatingLimits(req.user);
+    const filteredResults = await filterMoviesByRating(results.results, limits);
+
     const media = await Media.getRelatedMedia(
       req.user,
-      results.results.map((result) => ({
+      filteredResults.map((result) => ({
         tmdbId: result.id,
         mediaType: MediaType.MOVIE,
       })),
@@ -129,7 +156,7 @@ movieRoutes.get('/:id/similar', async (req, res, next) => {
       page: results.page,
       totalPages: results.total_pages,
       totalResults: results.total_results,
-      results: results.results.map((result) =>
+      results: filteredResults.map((result) =>
         mapMovieResult(
           result,
           media.find(
@@ -163,6 +190,21 @@ movieRoutes.get('/:id/ratings', async (req, res, next) => {
     const movie = await tmdb.getMovie({
       movieId: Number(req.params.id),
     });
+
+    const limits = getUserContentRatingLimits(req.user);
+    if (
+      limits &&
+      shouldFilterMovie(
+        getMovieCertification(movie),
+        limits.maxMovieRating,
+        limits.blockUnrated
+      )
+    ) {
+      return res.status(403).json({
+        status: 403,
+        message: 'Content restricted by parental controls.',
+      });
+    }
 
     const rtratings = await rtapi.getMovieRatings(
       movie.title,
@@ -202,6 +244,21 @@ movieRoutes.get('/:id/ratingscombined', async (req, res, next) => {
     const movie = await tmdb.getMovie({
       movieId: Number(req.params.id),
     });
+
+    const limits = getUserContentRatingLimits(req.user);
+    if (
+      limits &&
+      shouldFilterMovie(
+        getMovieCertification(movie),
+        limits.maxMovieRating,
+        limits.blockUnrated
+      )
+    ) {
+      return res.status(403).json({
+        status: 403,
+        message: 'Content restricted by parental controls.',
+      });
+    }
 
     const rtratings = await rtapi.getMovieRatings(
       movie.title,
