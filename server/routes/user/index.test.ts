@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
 
 import { MediaStatus, MediaType } from '@server/constants/media';
+import { UserType } from '@server/constants/user';
 import { getRepository } from '@server/datasource';
 import Media from '@server/entity/Media';
 import { User } from '@server/entity/User';
 import { Watchlist } from '@server/entity/Watchlist';
+import { Permission } from '@server/lib/permissions';
 import { getSettings } from '@server/lib/settings';
 import { checkUser, isAuthenticated } from '@server/middleware/auth';
 import authRoutes from '@server/routes/auth';
@@ -187,8 +189,48 @@ describe('validateBulkParentalControlFields', () => {
 
   it('allows an empty-string rating to clear the restriction', () => {
     assert.equal(
-      validateBulkParentalControlFields({ maxMovieRating: '', maxTvRating: '' }),
+      validateBulkParentalControlFields({
+        maxMovieRating: '',
+        maxTvRating: '',
+      }),
       null
     );
+  });
+});
+
+describe('PUT /user (bulk edit) parental controls', () => {
+  it('skips admins even when permissions are omitted from the body', async () => {
+    const userRepository = getRepository(User);
+    const otherAdmin = await userRepository.save(
+      new User({
+        email: 'other-admin@seerr.dev',
+        username: 'other-admin',
+        userType: UserType.LOCAL,
+        permissions: Permission.ADMIN,
+        avatar: '',
+      })
+    );
+    const demo = await userRepository.findOneOrFail({
+      where: { email: 'demo@seerr.dev' },
+    });
+
+    const admin = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await admin
+      .put('/user')
+      .send({ ids: [otherAdmin.id, demo.id], maxMovieRating: 'PG' });
+    assert.strictEqual(res.status, 200);
+
+    const [reloadedAdmin, reloadedDemo] = await Promise.all(
+      [otherAdmin.id, demo.id].map((id) =>
+        userRepository.findOneOrFail({
+          where: { id },
+          relations: { settings: true },
+        })
+      )
+    );
+    assert.strictEqual(reloadedAdmin.permissions, Permission.ADMIN);
+    assert.ok(!reloadedAdmin.settings?.maxMovieRating);
+    assert.strictEqual(reloadedDemo.permissions, 32);
+    assert.strictEqual(reloadedDemo.settings?.maxMovieRating, 'PG');
   });
 });

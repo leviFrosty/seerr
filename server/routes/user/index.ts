@@ -522,10 +522,7 @@ export const validateBulkParentalControlFields = (body: {
   ) {
     return `Invalid movie rating: ${body.maxMovieRating}`;
   }
-  if (
-    body.maxTvRating &&
-    !TV_RATINGS.includes(body.maxTvRating as TvRating)
-  ) {
+  if (body.maxTvRating && !TV_RATINGS.includes(body.maxTvRating as TvRating)) {
     return `Invalid TV rating: ${body.maxTvRating}`;
   }
   if (
@@ -581,6 +578,9 @@ router.put<
 
     const updatedUsers = await Promise.all(
       users.map(async (user) => {
+        // An omitted permissions field leaves the stored value untouched on
+        // save, so check against what the user will actually end up with.
+        const effectivePermissions = req.body.permissions ?? user.permissions;
         user.permissions = req.body.permissions;
 
         // Skip the owner and other MANAGE_USERS holders, same as the
@@ -588,7 +588,7 @@ router.put<
         if (
           hasParentalControlFields &&
           user.id !== 1 &&
-          !hasPermission(Permission.MANAGE_USERS, user.permissions)
+          !hasPermission(Permission.MANAGE_USERS, effectivePermissions)
         ) {
           if (!user.settings) {
             user.settings = new UserSettings({ user });
