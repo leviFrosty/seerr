@@ -9,10 +9,12 @@ import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
 import { ArrowDownOnSquareIcon } from '@heroicons/react/24/outline';
 import {
+  canEditParentalControls,
   getMovieRatingOptions,
   getTvRatingOptions,
 } from '@server/constants/contentRatings';
 import type { UserSettingsParentalControlsResponse } from '@server/interfaces/api/userSettingsInterfaces';
+import { hasPermission } from '@server/lib/permissions';
 import axios from 'axios';
 import { Field, Form, Formik } from 'formik';
 import { useRouter } from 'next/router';
@@ -38,6 +40,8 @@ const messages = defineMessages(
     blockunrated: 'Block Unrated Content',
     blockunratedTip:
       'Block content that has no rating (NR, Unrated). When disabled, unrated content is allowed through.',
+    requestManagerNote:
+      'Over-limit titles are hidden from discovery, search, and recommendations. Because this account can manage requests, it can still open them from the request queue to review them.',
     toastSettingsSuccess: 'Parental control settings saved successfully!',
     toastSettingsFailure: 'Something went wrong while saving settings.',
     unauthorizedDescription:
@@ -49,7 +53,8 @@ const UserParentalControlsSettings = () => {
   const intl = useIntl();
   const { addToast } = useToasts();
   const router = useRouter();
-  const { user, hasPermission } = useUser({
+  const { user: currentUser } = useUser();
+  const { user } = useUser({
     id: Number(router.query.userId),
   });
   const {
@@ -68,7 +73,7 @@ const UserParentalControlsSettings = () => {
     return <ErrorPage statusCode={500} />;
   }
 
-  if (user?.id === 1 || hasPermission(Permission.MANAGE_USERS)) {
+  if (!user || !canEditParentalControls(currentUser, user)) {
     return (
       <>
         <div className="mb-6">
@@ -99,6 +104,11 @@ const UserParentalControlsSettings = () => {
         <p className="description">
           {intl.formatMessage(messages.parentalcontrolsdescription)}
         </p>
+        {hasPermission(Permission.MANAGE_REQUESTS, user.permissions ?? 0) && (
+          <p className="description">
+            {intl.formatMessage(messages.requestManagerNote)}
+          </p>
+        )}
       </div>
       <Formik
         initialValues={{

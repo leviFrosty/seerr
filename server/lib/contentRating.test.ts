@@ -1,13 +1,17 @@
 import ExternalAPI from '@server/api/externalapi';
+import type { User } from '@server/entity/User';
 import {
   coalescePages,
   filterMediaByRating,
   filterMixedResults,
   filterMoviesByRating,
   filterTvByRating,
+  getDetailRatingLimits,
   getMovieCertification,
   getTvCertification,
+  getUserContentRatingLimits,
 } from '@server/lib/contentRating';
+import { hasPermission, Permission } from '@server/lib/permissions';
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it, mock } from 'node:test';
 
@@ -295,6 +299,32 @@ describe('filterMediaByRating', () => {
     const items = [{ id: 900, tmdbId: 3, mediaType: 'movie' }];
     assert.equal(await filterMediaByRating(items, undefined), items);
     assert.equal(externalApiGetMock.callCount(), 0);
+  });
+});
+
+describe('getDetailRatingLimits', () => {
+  const limitedUser = (permissions: number) =>
+    ({
+      permissions,
+      settings: { maxMovieRating: 'PG-13', maxTvRating: 'TV-14' },
+      hasPermission: (perm: Permission) => hasPermission(perm, permissions),
+    }) as unknown as User;
+
+  it('applies limits to detail pages for regular users', () => {
+    const user = limitedUser(Permission.REQUEST);
+    assert.deepEqual(
+      getDetailRatingLimits(user),
+      getUserContentRatingLimits(user)
+    );
+    assert.ok(getDetailRatingLimits(user));
+  });
+
+  it('exempts request managers from the detail block but not from lists', () => {
+    for (const permissions of [Permission.ADMIN, Permission.MANAGE_REQUESTS]) {
+      const user = limitedUser(permissions);
+      assert.equal(getDetailRatingLimits(user), undefined);
+      assert.ok(getUserContentRatingLimits(user));
+    }
   });
 });
 

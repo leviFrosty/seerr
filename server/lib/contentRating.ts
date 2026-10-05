@@ -14,6 +14,16 @@ import {
   type TvRating,
 } from '@server/constants/contentRatings';
 import type { User } from '@server/entity/User';
+import { Permission } from '@server/lib/permissions';
+
+// Detail pages back request cards, so request managers keep direct access to
+// over-limit titles they need to review. Their lists are still filtered.
+export function getDetailRatingLimits(
+  user?: User
+): UserContentRatingLimits | undefined {
+  if (user?.hasPermission(Permission.MANAGE_REQUESTS)) return undefined;
+  return getUserContentRatingLimits(user);
+}
 
 export function getUserContentRatingLimits(
   user?: User

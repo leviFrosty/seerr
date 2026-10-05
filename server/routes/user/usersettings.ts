@@ -1,7 +1,11 @@
 import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import type { MovieRating, TvRating } from '@server/constants/contentRatings';
-import { MOVIE_RATINGS, TV_RATINGS } from '@server/constants/contentRatings';
+import {
+  MOVIE_RATINGS,
+  TV_RATINGS,
+  canEditParentalControls,
+} from '@server/constants/contentRatings';
 import { ApiErrorCode } from '@server/constants/error';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
@@ -826,19 +830,11 @@ userSettingsRoutes.post<
         return next({ status: 404, message: 'User not found.' });
       }
 
-      if (user.id === 1) {
+      if (!canEditParentalControls(req.user, user)) {
         return next({
           status: 403,
           message:
-            'Cannot set parental controls for the primary administrator.',
-        });
-      }
-
-      if (user.hasPermission(Permission.MANAGE_USERS)) {
-        return next({
-          status: 403,
-          message:
-            'Cannot set parental controls for users with admin permissions.',
+            'You do not have permission to modify parental controls for this user.',
         });
       }
 

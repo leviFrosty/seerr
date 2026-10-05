@@ -1,3 +1,5 @@
+import { hasPermission, Permission } from '@server/lib/permissions';
+
 export const MOVIE_RATINGS = ['G', 'PG', 'PG-13', 'R', 'NC-17'] as const;
 export type MovieRating = (typeof MOVIE_RATINGS)[number];
 
@@ -96,4 +98,24 @@ export function getMovieRatingOptions(): { value: string; label: string }[] {
 
 export function getTvRatingOptions(): { value: string; label: string }[] {
   return TV_RATINGS.map((rating) => ({ value: rating, label: rating }));
+}
+
+// Mirrors how permission edits are guarded: user managers may set limits on
+// regular users, while the owner and other admins can only be limited by the
+// owner or by themselves.
+export function canEditParentalControls(
+  editor: { id: number; permissions?: number } | undefined,
+  target: { id: number; permissions?: number }
+): boolean {
+  if (
+    !editor ||
+    !hasPermission(Permission.MANAGE_USERS, editor.permissions ?? 0)
+  ) {
+    return false;
+  }
+  if (editor.id === 1 || editor.id === target.id) return true;
+
+  return (
+    target.id !== 1 && !hasPermission(Permission.ADMIN, target.permissions ?? 0)
+  );
 }

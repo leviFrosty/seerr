@@ -1616,6 +1616,7 @@
   "components.UserProfile.UserSettings.UserParentalControlsSettings.parentalcontrols": "Parental Controls",
   "components.UserProfile.UserSettings.UserParentalControlsSettings.parentalcontrolsdescription": "Set maximum content ratings and rating restrictions for this user. Limits use the US rating systems: MPAA for movies and TV Parental Guidelines for TV shows.",
   "components.UserProfile.UserSettings.UserParentalControlsSettings.parentalcontrolssettings": "Content Rating Limits",
+  "components.UserProfile.UserSettings.UserParentalControlsSettings.requestManagerNote": "Over-limit titles are hidden from discovery, search, and recommendations. Because this account can manage requests, it can still open them from the request queue to review them.",
   "components.UserProfile.UserSettings.UserParentalControlsSettings.toastSettingsFailure": "Something went wrong while saving settings.",
   "components.UserProfile.UserSettings.UserParentalControlsSettings.toastSettingsSuccess": "Parental control settings saved successfully!",
   "components.UserProfile.UserSettings.UserParentalControlsSettings.unauthorizedDescription": "You do not have permission to modify parental controls for this user.",

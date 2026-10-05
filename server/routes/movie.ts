@@ -9,6 +9,7 @@ import Media from '@server/entity/Media';
 import { Watchlist } from '@server/entity/Watchlist';
 import {
   filterMoviesByRating,
+  getDetailRatingLimits,
   getMovieCertification,
   getUserContentRatingLimits,
 } from '@server/lib/contentRating';
@@ -28,7 +29,7 @@ movieRoutes.get('/:id', async (req, res, next) => {
       language: (req.query.language as string) ?? req.locale,
     });
 
-    const limits = getUserContentRatingLimits(req.user);
+    const limits = getDetailRatingLimits(req.user);
     if (
       limits &&
       shouldFilterMovie(
@@ -191,7 +192,7 @@ movieRoutes.get('/:id/ratings', async (req, res, next) => {
       movieId: Number(req.params.id),
     });
 
-    const limits = getUserContentRatingLimits(req.user);
+    const limits = getDetailRatingLimits(req.user);
     if (
       limits &&
       shouldFilterMovie(
@@ -245,7 +246,7 @@ movieRoutes.get('/:id/ratingscombined', async (req, res, next) => {
       movieId: Number(req.params.id),
     });
 
-    const limits = getUserContentRatingLimits(req.user);
+    const limits = getDetailRatingLimits(req.user);
     if (
       limits &&
       shouldFilterMovie(

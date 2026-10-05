@@ -1,10 +1,12 @@
 import {
+  canEditParentalControls,
   getAllowedRatings,
   MOVIE_RATINGS,
   shouldFilterMovie,
   shouldFilterTv,
   TV_RATINGS,
 } from '@server/constants/contentRatings';
+import { Permission } from '@server/lib/permissions';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
@@ -94,5 +96,45 @@ describe('getAllowedRatings', () => {
     assert.deepEqual(getAllowedRatings('tv', { maxTvRating: 'NOT-A-RATING' }), [
       TV_RATINGS[0],
     ]);
+  });
+});
+
+describe('canEditParentalControls', () => {
+  const owner = { id: 1, permissions: Permission.ADMIN };
+  const admin = { id: 2, permissions: Permission.ADMIN };
+  const otherAdmin = { id: 3, permissions: Permission.ADMIN };
+  const manager = { id: 4, permissions: Permission.MANAGE_USERS };
+  const user = { id: 5, permissions: Permission.REQUEST };
+
+  it('lets the owner limit anyone, including themselves', () => {
+    assert.equal(canEditParentalControls(owner, owner), true);
+    assert.equal(canEditParentalControls(owner, admin), true);
+    assert.equal(canEditParentalControls(owner, user), true);
+  });
+
+  it('lets admins and user managers limit themselves', () => {
+    assert.equal(canEditParentalControls(admin, admin), true);
+    assert.equal(canEditParentalControls(manager, manager), true);
+  });
+
+  it('keeps the owner and other admins out of reach of non-owners', () => {
+    assert.equal(canEditParentalControls(admin, owner), false);
+    assert.equal(canEditParentalControls(admin, otherAdmin), false);
+    assert.equal(canEditParentalControls(manager, admin), false);
+    assert.equal(
+      canEditParentalControls(manager, { ...owner, permissions: 0 }),
+      false
+    );
+  });
+
+  it('lets user managers limit regular users and other managers', () => {
+    assert.equal(canEditParentalControls(admin, user), true);
+    assert.equal(canEditParentalControls(manager, user), true);
+    assert.equal(canEditParentalControls(admin, manager), true);
+  });
+
+  it('never lets users without Manage Users edit limits, even their own', () => {
+    assert.equal(canEditParentalControls(user, user), false);
+    assert.equal(canEditParentalControls(undefined, user), false);
   });
 });

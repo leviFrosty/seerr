@@ -198,39 +198,114 @@ describe('validateBulkParentalControlFields', () => {
   });
 });
 
+async function createAdmin(email: string): Promise<User> {
+  const user = new User({
+    email,
+    username: email.split('@')[0],
+    userType: UserType.LOCAL,
+    permissions: Permission.ADMIN,
+    avatar: '',
+  });
+  await user.setPassword('test1234');
+  return getRepository(User).save(user);
+}
+
+async function limitsOf(id: number) {
+  const user = await getRepository(User).findOneOrFail({
+    where: { id },
+    relations: { settings: true },
+  });
+  return {
+    permissions: user.permissions,
+    maxMovieRating: user.settings?.maxMovieRating ?? null,
+  };
+}
+
+describe('POST /user/:id/settings/parental-controls', () => {
+  it('lets the owner limit their own account', async () => {
+    const owner = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await owner
+      .post('/user/1/settings/parental-controls')
+      .send({ maxMovieRating: 'PG-13', maxTvRating: 'TV-14' });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual((await limitsOf(1)).maxMovieRating, 'PG-13');
+  });
+
+  it('lets an admin limit themselves but not the owner or other admins', async () => {
+    const admin = await createAdmin('second-admin@seerr.dev');
+    const third = await createAdmin('third-admin@seerr.dev');
+    const agent = await loginAs('second-admin@seerr.dev', 'test1234');
+    const body = { maxMovieRating: 'PG' };
+
+    const self = await agent
+      .post(`/user/${admin.id}/settings/parental-controls`)
+      .send(body);
+    const owner = await agent
+      .post('/user/1/settings/parental-controls')
+      .send(body);
+    const other = await agent
+      .post(`/user/${third.id}/settings/parental-controls`)
+      .send(body);
+
+    assert.strictEqual(self.status, 200);
+    assert.strictEqual(owner.status, 403);
+    assert.strictEqual(other.status, 403);
+    assert.strictEqual((await limitsOf(admin.id)).maxMovieRating, 'PG');
+    assert.strictEqual((await limitsOf(1)).maxMovieRating, null);
+    assert.strictEqual((await limitsOf(third.id)).maxMovieRating, null);
+  });
+
+  it('does not let a regular user change their own limits', async () => {
+    const demo = await getRepository(User).findOneOrFail({
+      where: { email: 'demo@seerr.dev' },
+    });
+    const agent = await loginAs('demo@seerr.dev', 'test1234');
+    const res = await agent
+      .post(`/user/${demo.id}/settings/parental-controls`)
+      .send({ maxMovieRating: 'NC-17' });
+
+    assert.strictEqual(res.status, 403);
+  });
+});
+
 describe('PUT /user (bulk edit) parental controls', () => {
-  it('skips admins even when permissions are omitted from the body', async () => {
-    const userRepository = getRepository(User);
-    const otherAdmin = await userRepository.save(
-      new User({
-        email: 'other-admin@seerr.dev',
-        username: 'other-admin',
-        userType: UserType.LOCAL,
-        permissions: Permission.ADMIN,
-        avatar: '',
-      })
-    );
-    const demo = await userRepository.findOneOrFail({
+  it('lets the owner limit admins without touching their permissions', async () => {
+    const otherAdmin = await createAdmin('other-admin@seerr.dev');
+    const demo = await getRepository(User).findOneOrFail({
       where: { email: 'demo@seerr.dev' },
     });
 
-    const admin = await loginAs('admin@seerr.dev', 'test1234');
-    const res = await admin
+    const owner = await loginAs('admin@seerr.dev', 'test1234');
+    const res = await owner
       .put('/user')
       .send({ ids: [otherAdmin.id, demo.id], maxMovieRating: 'PG' });
     assert.strictEqual(res.status, 200);
 
-    const [reloadedAdmin, reloadedDemo] = await Promise.all(
-      [otherAdmin.id, demo.id].map((id) =>
-        userRepository.findOneOrFail({
-          where: { id },
-          relations: { settings: true },
-        })
-      )
-    );
-    assert.strictEqual(reloadedAdmin.permissions, Permission.ADMIN);
-    assert.ok(!reloadedAdmin.settings?.maxMovieRating);
-    assert.strictEqual(reloadedDemo.permissions, 32);
-    assert.strictEqual(reloadedDemo.settings?.maxMovieRating, 'PG');
+    assert.deepEqual(await limitsOf(otherAdmin.id), {
+      permissions: Permission.ADMIN,
+      maxMovieRating: 'PG',
+    });
+    assert.deepEqual(await limitsOf(demo.id), {
+      permissions: 32,
+      maxMovieRating: 'PG',
+    });
+  });
+
+  it('skips other admins when a non-owner admin bulk edits', async () => {
+    await createAdmin('second-admin@seerr.dev');
+    const third = await createAdmin('third-admin@seerr.dev');
+    const demo = await getRepository(User).findOneOrFail({
+      where: { email: 'demo@seerr.dev' },
+    });
+
+    const agent = await loginAs('second-admin@seerr.dev', 'test1234');
+    const res = await agent
+      .put('/user')
+      .send({ ids: [third.id, demo.id], maxMovieRating: 'PG' });
+    assert.strictEqual(res.status, 200);
+
+    assert.strictEqual((await limitsOf(third.id)).maxMovieRating, null);
+    assert.strictEqual((await limitsOf(demo.id)).maxMovieRating, 'PG');
   });
 });

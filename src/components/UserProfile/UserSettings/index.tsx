@@ -9,6 +9,7 @@ import { useUser } from '@app/hooks/useUser';
 import globalMessages from '@app/i18n/globalMessages';
 import ErrorPage from '@app/pages/_error';
 import defineMessages from '@app/utils/defineMessages';
+import { canEditParentalControls } from '@server/constants/contentRatings';
 import type { UserSettingsNotificationsResponse } from '@server/interfaces/api/userSettingsInterfaces';
 import { hasPermission, Permission } from '@server/lib/permissions';
 import { useRouter } from 'next/router';
@@ -93,10 +94,7 @@ const UserSettings = ({ children }: UserSettingsProps) => {
       route: '/settings/parental-controls',
       regex: /\/settings\/parental-controls/,
       requiredPermission: Permission.MANAGE_USERS,
-      hidden:
-        user.id === 1 ||
-        currentUser?.id === user.id ||
-        hasPermission(Permission.MANAGE_USERS, user.permissions ?? 0),
+      hidden: !canEditParentalControls(currentUser, user),
     },
   ];
 

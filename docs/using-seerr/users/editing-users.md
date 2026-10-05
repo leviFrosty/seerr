@@ -71,4 +71,6 @@ When a limit is set, content above it is hidden from Discover, search, and recom
 Setting a series rating limit hides shows that have no US TV rating. Most popular shows are rated, but much of the wider catalog is not.
 :::
 
-Parental controls cannot be set for the server owner or for users with the **Manage Users** permission, and users cannot see or change their own limits.
+Only the server owner can set limits for the owner account or for other admins, though admins can also set limits on themselves from their own profile settings. Other users cannot see or change their own limits.
+
+Users with the **Manage Requests** permission still have over-limit titles hidden from Discover, search, and recommendations, but can open their detail pages so requests for them can still be reviewed.

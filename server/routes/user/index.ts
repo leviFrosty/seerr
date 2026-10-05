@@ -2,7 +2,11 @@ import JellyfinAPI from '@server/api/jellyfin';
 import PlexTvAPI from '@server/api/plextv';
 import TautulliAPI from '@server/api/tautulli';
 import type { MovieRating, TvRating } from '@server/constants/contentRatings';
-import { MOVIE_RATINGS, TV_RATINGS } from '@server/constants/contentRatings';
+import {
+  MOVIE_RATINGS,
+  TV_RATINGS,
+  canEditParentalControls,
+} from '@server/constants/contentRatings';
 import { MediaType } from '@server/constants/media';
 import { MediaServerType } from '@server/constants/server';
 import { UserType } from '@server/constants/user';
@@ -583,12 +587,13 @@ router.put<
         const effectivePermissions = req.body.permissions ?? user.permissions;
         user.permissions = req.body.permissions;
 
-        // Skip the owner and other MANAGE_USERS holders, same as the
-        // single-user parental-controls endpoint.
+        // Same rule as the single-user parental-controls endpoint.
         if (
           hasParentalControlFields &&
-          user.id !== 1 &&
-          !hasPermission(Permission.MANAGE_USERS, effectivePermissions)
+          canEditParentalControls(req.user, {
+            id: user.id,
+            permissions: effectivePermissions,
+          })
         ) {
           if (!user.settings) {
             user.settings = new UserSettings({ user });

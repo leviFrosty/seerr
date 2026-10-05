@@ -10,6 +10,7 @@ import Media from '@server/entity/Media';
 import { Watchlist } from '@server/entity/Watchlist';
 import {
   filterTvByRating,
+  getDetailRatingLimits,
   getTvCertification,
   getUserContentRatingLimits,
 } from '@server/lib/contentRating';
@@ -28,7 +29,7 @@ tvRoutes.get('/:id', async (req, res, next) => {
       tvId: Number(req.params.id),
     });
 
-    const limits = getUserContentRatingLimits(req.user);
+    const limits = getDetailRatingLimits(req.user);
     if (
       limits &&
       shouldFilterTv(
@@ -95,7 +96,7 @@ tvRoutes.get('/:id/season/:seasonNumber', async (req, res, next) => {
       tvId: Number(req.params.id),
     });
 
-    const limits = getUserContentRatingLimits(req.user);
+    const limits = getDetailRatingLimits(req.user);
     if (
       limits &&
       shouldFilterTv(
@@ -242,7 +243,7 @@ tvRoutes.get('/:id/ratings', async (req, res, next) => {
       tvId: Number(req.params.id),
     });
 
-    const limits = getUserContentRatingLimits(req.user);
+    const limits = getDetailRatingLimits(req.user);
     if (
       limits &&
       shouldFilterTv(
